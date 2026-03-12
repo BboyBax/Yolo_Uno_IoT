@@ -11,7 +11,7 @@ void TaskLEDControl(void *pvParameters) {
       digitalWrite(GPIO_NUM_48, LOW); // Turn OFF LED
     }
     ledState = 1 - ledState;
-    vTaskDelay(2000);
+    vTaskDelay(1000);
   }
 }
 
