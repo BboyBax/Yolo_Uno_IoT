@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <neo_pixel.h>
 
 void TaskLEDControl(void *pvParameters) {
   pinMode(GPIO_NUM_48, OUTPUT); // Initialize LED pin
@@ -11,15 +12,17 @@ void TaskLEDControl(void *pvParameters) {
       digitalWrite(GPIO_NUM_48, LOW); // Turn OFF LED
     }
     ledState = 1 - ledState;
-    vTaskDelay(2000);
+    vTaskDelay(1000);
   }
 }
+
 
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
   xTaskCreate(TaskLEDControl, "LED Control", 2048, NULL, 2, NULL);
+  xTaskCreate(neo_pixel, "NEO Pixel", 2048, NULL, 3, NULL);
 }
 
 void loop() {
