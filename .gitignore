@@ -3,3 +3,43 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+
+# Ignore hệ điều hành
+.DS_Store
+Thumbs.db
+
+# Ignore log files
+*.log
+*.tmp
+*.bak
+
+# Ignore thư mục build
+/bin/
+/obj/
+/dist/
+/build/
+
+# Ignore node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Ignore Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+
+# Ignore IDE/editor
+.vscode/
+.idea/
+*.swp
+
+# Ignore test coverage
+coverage/
+*.lcov
+
+# Ignore dữ liệu khác
+*.sqlite
+*.db
