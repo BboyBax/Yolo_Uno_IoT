@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <mainserver.h>
 
 void TaskLEDControl(void *pvParameters) {
   pinMode(GPIO_NUM_48, OUTPUT); // Initialize LED pin
@@ -20,6 +21,7 @@ void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
   xTaskCreate(TaskLEDControl, "LED Control", 2048, NULL, 2, NULL);
+  xTaskCreate(main_server_task, "Task Main Server" ,8192  ,NULL  ,2 , NULL);
 }
 
 void loop() {
