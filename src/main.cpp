@@ -22,6 +22,7 @@ void setup() {
   Serial.begin(115200);
   xTaskCreate(TaskLEDControl, "LED Control", 2048, NULL, 2, NULL);
   xTaskCreate(Temp_Hum_Sensor, "Temp_Hum_Sensor", 2048, NULL, 2, NULL);
+  // xTaskCreate(setup_lcd, "setup_lcd", 2048, NULL, 2, NULL);
 }
 
 void loop() {
