@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard Cảm Biến IoT trên YOLO_UNO</title>
+
+  <!-- Liên kết CSS -->
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+  <h1>
+    Dashboard Cảm Biến IoT trên YOLO_UNO
+  </h1>
+  <div class="top-bar">
+    <div class="left-text">Giám sát và điều khiển thiết bị theo thời gian thực</div>
+    <div class="right-text">
+      <img src="icon\connect.png" alt="Icon" style="width:24px; vertical-align:middle; margin-right:8px;">
+      Đang kết nối
+    </div>
+  </div>
+  <div class="grid-container">
+    <div class="card temperature">
+      <div class="header">
+        <h2>Nhiệt Độ</h2>
+        <img src="icon\temperature.png" alt="Icon" style="width:24px; vertical-align:middle; margin-right:8px;">
+      </div>
+      <div class="value">
+      <div class="sensor">
+        <span id="temp">--</span>
+      </div>
+      </div>
+      <p class="change up">↑ +0.5 &deg;C từ giờ trước</p>
+    </div>
+
+    <div class="card humidity">
+      <div class="header">
+        <h2>Độ ẩm</h2>
+        <img src="icon\humidity.png" alt="Icon" style="width:24px; vertical-align:middle; margin-right:8px;">
+      </div>
+      <div class="value">
+      <div class="sensor">
+        <span id="hum">--</span>
+      </div>
+      </div> 
+      <p class="change up">↑ +0.5 % từ giờ trước</p>
+    </div>
+
+<div class="card control">
+      <div class="header">
+        <h1>Bảng điều khiển chính</h1>
+      </div>
+      <div class="control-row">
+      <h2> 
+        <img src="icon\power.png" alt="Icon" style="width:24px; vertical-align:middle; margin-right:8px;">
+        Nguồn chính  
+      </h2>
+      <button id="btn-power" class="btn-power">Bật Nguồn</button>
+      </div> 
+      <div class="control-row">
+      <h2>
+        <img src="icon\lamp.png" alt="Icon" style="width:24px; vertical-align:middle; margin-right:8px;">
+        Đèn
+      </h2>
+      <button id="btn-led" class="btn-led">Bật Đèn</button>
+      </div>
+      <div class="control-row">
+      <h2>
+        <img src="icon\fan.png" alt="Icon" style="width:24px; vertical-align:middle; margin-right:8px;">
+        Quạt
+      </h2>
+      <button id="btn-fan" class="btn-fan">Bật Quạt</button>
+      </div>
+      <h2>  
+        <div class="control-center">
+          <button id="btn-refresh" class="btn-refresh">Làm Mới Dữ Liệu</button>
+          <button id="btn-off" class="btn-off">Tắt Tất Cả Thiết Bị</button>
+        </div>
+      </h2>
+    </div>
+  
+
+    <div class="card chart-temp">
+      <div class="header">
+        <h2>Biểu đồ nhiệt độ</h2>
+      </div>
+      <canvas id="tempChart"></canvas>
+    </div>
+
+    <div class="card chart-hum">
+      <div class="header">
+        <h2>Biểu đồ độ ẩm </h2>
+      </div>
+      <canvas id="humChart"></canvas>
+    </div>
+</div>
+    
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- JS của bạn -->
+  <script src="script.js"></script>
+</body>
+</html>
+
