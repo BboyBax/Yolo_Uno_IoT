@@ -1,4 +1,4 @@
-#include "Semaphore.h"
+#include "global.h"
 
 SemaphoreHandle_t i2cSemaphore;
 float temperature = 0;

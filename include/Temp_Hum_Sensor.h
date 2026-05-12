@@ -2,7 +2,7 @@
 #define __TEMP_HUM_SENSOR__
 #include <Arduino.h>
 #include "DHT20.h"
-#include "Semaphore.h"
+#include "global.h"
 
 
 void Temp_Hum_Sensor(void *pvParameters);

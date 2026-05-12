@@ -2,7 +2,7 @@
 #define __NEO_PIXEL__
 #include <Arduino.h>
 #include <Adafruit_NeoPixel.h>
-#include "Semaphore.h"
+#include "global.h"
 
 #define NEO_PIN 45
 #define LED_COUNT 1

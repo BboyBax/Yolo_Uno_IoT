@@ -1,10 +1,10 @@
-#ifndef __LCD__
-#define __LCD__
+// #ifndef __LCD__
+// #define __LCD__
 
-#include <Arduino.h>
-#include "LiquidCrystal_I2C.h"
-#include "Semaphore.h"
+// #include <Arduino.h>
+// #include "LiquidCrystal_I2C.h"
+// #include "global.h"
 
-void Display_Temp_Hum(void *pvParameters);
+// void Display_Temp_Hum(void *pvParameters);
 
-#endif 
+// #endif 

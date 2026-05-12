@@ -2,8 +2,9 @@
 #include "Led_Blinky.h"
 #include "Temp_Hum_Sensor.h"
 #include "neo_pixel.h"
-#include "LCD.h"
-#include "Semaphore.h"
+// #include "LCD.h"
+#include "global.h"
+// #include "coreiot.h"
 
 
 
@@ -13,8 +14,8 @@ void setup() {
   i2cSemaphore = xSemaphoreCreateMutex();
   xTaskCreate(Led_Blinky, "Led_Blinky", 2048, NULL, 2, NULL);
   xTaskCreate(Temp_Hum_Sensor, "Temp_Hum_Sensor", 2048, NULL, 2, NULL);
-  xTaskCreate(Display_Temp_Hum, "Display_Temp_Hum", 2048, NULL, 2, NULL);
   xTaskCreate(Neo_Pixel, "Neo_Pixel", 2048, NULL, 2, NULL);
+  // xTaskCreate(coreiot_task, "coreiot_task", 2048, NULL, 2, NULL);
 }
 
 void loop() {
