@@ -1,34 +1,59 @@
 #include <Arduino.h>
-#include <mainserver.h>
-#include <Temp_Hum_Sensor.h>
+#include "mainserver.h"
+#include "Temp_Hum_Sensor.h"
+#include "led_blinky.h"
+// #include "neo_blinky.h"
+#include "tinyml.h"
+#include "coreiot.h"
+#include "task_wifi.h"
 
-void TaskLEDControl(void *pvParameters) {
-  pinMode(GPIO_NUM_48, OUTPUT); // Initialize LED pin
-  int ledState = 0;
-  while(1) {
-    
-    if (ledState == 0) {
-      digitalWrite(GPIO_NUM_48, HIGH); // Turn ON LED
-    } else {
-      digitalWrite(GPIO_NUM_48, LOW); // Turn OFF LED
-    }
-    ledState = 1 - ledState;
-    vTaskDelay(500);
-  }
-}
-
+// Static instance holding our system handles (to be passed as a void* to tasks)
+static SystemHandles sysHandles;
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
-  xTaskCreate(TaskLEDControl, "LED Control", 2048, NULL, 2, NULL);
-  xTaskCreate(Temp_Hum_Sensor, "Temp_Hum_Sensor", 2048, NULL, 2, NULL);
-  // xTaskCreate(setup_server, "Task Main Server" ,8192  ,NULL  ,2 , NULL);
-  xTaskCreate(main_server_task, "Task Main Server" ,8192  ,NULL  ,2 , NULL);
+  pinMode(48, OUTPUT);
+  // Initialize Queues with capacity for 1 SensorData structure
+  sysHandles.qLed = xQueueCreate(1, sizeof(SensorData));
+  sysHandles.qNeo = xQueueCreate(1, sizeof(SensorData));
+  sysHandles.qLcd = xQueueCreate(1, sizeof(SensorData));
+  sysHandles.qTinyML  = xQueueCreate(1, sizeof(TinyMLData));
+  sysHandles.qTrigger = xQueueCreate(1, sizeof(int));
+
+  // Initialize Binary Semaphore (for LCD) and Mutex (for I2C and Device States)
+  sysHandles.semLcd = xSemaphoreCreateBinary();
+  sysHandles.mutexI2C = xSemaphoreCreateMutex();
+  sysHandles.mutexDeviceState = xSemaphoreCreateMutex();
+  sysHandles.mutexConfig = xSemaphoreCreateMutex();
+
+  // Initialize device default states
+  sysHandles.deviceState.led_1 = false;
+  sysHandles.deviceState.led_2 = false;
+  sysHandles.deviceState.tinyml_mode = false;
+
+  // Initialize Zero-Global credentials Default
+  sysHandles.sysData.wifi_ssid = "";
+  sysHandles.sysData.wifi_pass = ""; // Requirement
+  sysHandles.sysData.fallback_ssid = "";
+  sysHandles.sysData.fallback_pass = "";
+  sysHandles.sysData.coreiot_server = "";
+  sysHandles.sysData.coreiot_port = ""; // Note: HTTP will just use the server root, port 1883 might not be needed for HTTP
+  sysHandles.sysData.coreiot_token = "";
+  sysHandles.sysData.ap_ssid = "MY ESP32_S3 NETWORK";
+  sysHandles.sysData.ap_pass = "12345678";
+
+  // Init Event-Driven WiFi (Zero-blocking)
+  init_wifi(&sysHandles);
+
+  xTaskCreate(led_blinky, "led_blinky", 2048, (void*)&sysHandles, 2, NULL);
+  xTaskCreate(Temp_Hum_Sensor, "Temp_Hum_Sensor", 2048, (void*)&sysHandles, 2, NULL);
+  xTaskCreate(main_server_task, "Task Main Server" ,8192  ,(void*)&sysHandles  ,2 , NULL);
+  xTaskCreate(tiny_ml_task, "Tiny ML Task" ,2048  ,(void*)&sysHandles  ,2 , NULL);
+  xTaskCreate(wifi_task, "wifi_task" ,2048  ,(void*)&sysHandles  ,2 , NULL);
+  xTaskCreate(coreiot_task, "CoreIOT Task" ,4096  ,(void*)&sysHandles  ,2 , NULL);
 }
 
 void loop() {
-  // Serial.println("Hello Custom Board");
-  // loop_server();
-  delay(1000);
+  vTaskDelete(NULL);
 }

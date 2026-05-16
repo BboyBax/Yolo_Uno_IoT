@@ -1,153 +1,312 @@
 #include "mainserver.h"
-#include <WiFi.h>
-#include <WebServer.h>
 
-bool led1_state = false;
-bool led2_state = false;
-bool isAPMode = true;
+// Helper to serve files from SPIFFS
+void handleFile(WebServer& server, const char* path, const char* type) {
+    File file = SPIFFS.open(path, "r");
+    if (file) {
+        server.streamFile(file, type);
+        file.close();
+    } else {
+        server.send(404, "text/plain", "File not found");
+    }
+}
 
-WebServer server(80);
-
-unsigned long connect_start_ms = 0;
-bool connecting = false;
-
-// ========== Handlers ==========
-
-void handleSensors()
-{
-  float t = glob_temperature;
-  float h = glob_humidity;
-  String json = "{\"temp\":" + String(t) + ",\"hum\":" + String(h) + "}";
+void handleStatus(WebServer& server, SystemHandles* handles) {
+  String json = "{";
+  json += "\"led1\":" + String(handles->deviceState.led_1 ? 1 : 0);
+  json += ",\"led2\":" + String(handles->deviceState.led_2 ? 1 : 0);
+  json += "}";
+  Serial.println(json);
   server.send(200, "application/json", json);
 }
 
-void handlePower() {
-  if (server.hasArg("state")) {
-    String state = server.arg("state");
-    if (state == "on") {
-      digitalWrite(POWER_PIN, HIGH);  
-      server.send(200, "text/plain", "Power ON");
-    } else if (state == "off") {
-      digitalWrite(POWER_PIN, LOW);
-      server.send(200, "text/plain", "Power OFF");
-    } else {
-      server.send(400, "text/plain", "Invalid state");
+
+// Hàm xử lý dữ liệu cảm biến
+void handleSensors(WebServer& server, SystemHandles* handles) {
+    SensorData d = {0, 0, 0};
+    // Peek from queue if available
+    if (handles->qLcd != NULL) {
+        xQueuePeek(handles->qLcd, &d, 0);
     }
-  } else {
-    server.send(400, "text/plain", "Missing state");
-  }
+    String json = "{\"temp\":" + String(d.temperature, 1) + ",\"hum\":" + String(d.humidity, 1) + "}";
+    server.send(200, "application/json", json);
 }
 
-void handleLed() {
-  if (server.hasArg("state")) {
-    String state = server.arg("state");
-    if (state == "on") {
-      digitalWrite(LED_PIN, HIGH);
-      server.send(200, "text/plain", "LED ON");
-    } else if (state == "off") {
-      digitalWrite(LED_PIN, LOW);
-      server.send(200, "text/plain", "LED OFF");
+// Hàm xử lý led 1
+void handleLed_1(WebServer& server, SystemHandles* handles, Adafruit_NeoPixel &rgb_4_led) {
+
+    xSemaphoreTake(handles->mutexDeviceState, portMAX_DELAY);
+
+    if (server.hasArg("state")) {
+        String state = server.arg("state");
+        handles->deviceState.led_1 = (state == "on");
     } else {
-      server.send(400, "text/plain", "Invalid state");
+        handles->deviceState.led_1 = !handles->deviceState.led_1;
     }
-  } else {
-    server.send(400, "text/plain", "Missing state");
-  }
-}
-void handleConnect()
-{
-  wifi_ssid = server.arg("ssid");
-  wifi_password = server.arg("pass");
-  server.send(200, "text/plain", "Connecting....");
-  isAPMode = false;
-  connecting = true;
-  connect_start_ms = millis();
-  connectToWiFi();
+
+    bool led1 = handles->deviceState.led_1;
+    bool led2 = handles->deviceState.led_2;
+
+    rgb_4_led.setPixelColor(LED_1_PIN,
+        led1 ? rgb_4_led.Color(255,255,255)
+             : rgb_4_led.Color(0,0,0));
+    rgb_4_led.show();
+
+    xSemaphoreGive(handles->mutexDeviceState);
+
+    // ===== JSON LOG =====
+    String json = "{";
+    json += "\"led1\":" + String(led1 ? 1 : 0);
+    json += ",\"led2\":" + String(led2 ? 1 : 0);
+    json += "}";
+    Serial.println(json);
+
+    server.send(200, "application/json", json);
 }
 
-// ========== WiFi ==========
-void setupServer()
-{
-  SPIFFS.begin();
+// Hàm xử lý led 2
+void handleLed_2(WebServer& server, SystemHandles* handles, Adafruit_NeoPixel &rgb_4_led) {
 
-  // Route trả về index.html
-  server.on("/", [](){
-    File file = SPIFFS.open("/index.html", "r");
-    if(file){
-      server.streamFile(file, "text/html");
-      file.close();
+    xSemaphoreTake(handles->mutexDeviceState, portMAX_DELAY);
+
+    if (server.hasArg("state")) {
+        String state = server.arg("state");
+        handles->deviceState.led_2 = (state == "on");
     } else {
-      server.send(404, "text/plain", "File not found");
+        handles->deviceState.led_2 = !handles->deviceState.led_2;
     }
-  });
 
-  // Route trả về style.css
-  server.on("/style.css", [](){
-    File file = SPIFFS.open("/style.css", "r");
-    if(file){
-      server.streamFile(file, "text/css");
-      file.close();
+    bool led1 = handles->deviceState.led_1;
+    bool led2 = handles->deviceState.led_2;
+
+    rgb_4_led.setPixelColor(LED_2_PIN,
+        led2 ? rgb_4_led.Color(255,255,255)
+             : rgb_4_led.Color(0,0,0));
+    rgb_4_led.show();
+
+    xSemaphoreGive(handles->mutexDeviceState);
+
+    // ===== JSON LOG =====
+    String json = "{";
+    json += "\"led1\":" + String(led1 ? 1 : 0);
+    json += ",\"led2\":" + String(led2 ? 1 : 0);
+    json += "}";
+    Serial.println(json);
+
+    server.send(200, "application/json", json);
+}
+
+// Hàm xử lý nút tắt tất cả
+void handleOff(WebServer& server, SystemHandles* handles, Adafruit_NeoPixel &rgb_4_led) {
+
+    xSemaphoreTake(handles->mutexDeviceState, portMAX_DELAY);
+
+    handles->deviceState.led_1 = false;
+    handles->deviceState.led_2 = false;
+
+    rgb_4_led.setPixelColor(LED_1_PIN, rgb_4_led.Color(0,0,0));
+    rgb_4_led.setPixelColor(LED_2_PIN, rgb_4_led.Color(0,0,0));
+    rgb_4_led.show();
+
+    xSemaphoreGive(handles->mutexDeviceState);
+
+    // ===== JSON LOG =====
+    String json = "{\"led1\":0,\"led2\":0}";
+    Serial.println(json);
+
+    server.send(200, "application/json", json);
+}
+
+// Hàm xử lý dự đoán 
+void handleTinyML(WebServer& server, SystemHandles* handles) {
+    String switchParam = server.arg("switch");
+    String json;
+
+    if (switchParam == "1") {
+        xSemaphoreTake(handles->mutexDeviceState, portMAX_DELAY);
+        if (!handles->deviceState.tinyml_mode) {
+            handles->deviceState.tinyml_mode = true;
+            xSemaphoreGive(handles->mutexDeviceState);
+            xSemaphoreGive(handles->semLcd); // wake up LCD
+        } else {
+            xSemaphoreGive(handles->mutexDeviceState);
+        }
+
+        // Switch bật lấy thông tin tinyML
+        int trigger = 1;
+        xQueueSend(handles->qTrigger, &trigger, 0);
+        TinyMLData predict_data = {0, ""};
+        // Đọc kết quả TinyML
+        if (handles->qTinyML != NULL && 
+            xQueuePeek(handles->qTinyML, &predict_data, 100) == pdTRUE) {
+            
+            json = "{";
+            json += "\"state\":\"on\",";
+            json += "\"label\":\"" + String(predict_data.predict_state) + "\",";
+            json += "\"value\":" + String(predict_data.predict_value);
+            json += "}";
+            Serial.println(predict_data.predict_value);
+            Serial.println(predict_data.predict_state);
+        } else {
+            json = "{\"state\":\"on\",\"label\":\"WAITING\"}";
+        }
     } else {
-      server.send(404, "text/plain", "File not found");
-    }
-  });
+        xSemaphoreTake(handles->mutexDeviceState, portMAX_DELAY);
+        if (handles->deviceState.tinyml_mode) {
+            handles->deviceState.tinyml_mode = false;
+            xSemaphoreGive(handles->mutexDeviceState);
+            xSemaphoreGive(handles->semLcd); // wake up LCD
+        } else {
+            xSemaphoreGive(handles->mutexDeviceState);
+        }
 
-  // Route trả về script.js
-  server.on("/script.js", [](){
-    File file = SPIFFS.open("/script.js", "r");
-    if(file){
-      server.streamFile(file, "application/javascript");
-      file.close();
+        json = "{\"state\":\"\"}";
+    }
+
+    server.send(200, "application/json", json);
+}
+
+// Handle dynamic config from test.html
+void handleConnect(WebServer& server, SystemHandles* handles) {
+    if (server.hasArg("ssid") && server.hasArg("pass") && server.hasArg("token")) {
+        // Safe Zero-Global update using mutex
+        xSemaphoreTake(handles->mutexConfig, portMAX_DELAY);
+        
+        // Lưu lại cấu hình cũ phòng trường hợp mất mạng
+        handles->sysData.fallback_ssid = handles->sysData.wifi_ssid;
+        handles->sysData.fallback_pass = handles->sysData.wifi_pass;
+
+        handles->sysData.wifi_ssid = server.arg("ssid");
+        handles->sysData.wifi_pass = server.arg("pass");
+        handles->sysData.coreiot_server = server.arg("server");
+        handles->sysData.coreiot_port = server.arg("port");
+        handles->sysData.coreiot_token = server.arg("token");
+        xSemaphoreGive(handles->mutexConfig);
+
+        // Lưu xuống Preferences
+        Preferences prefs;
+        prefs.begin("config", false);
+        prefs.putString("ssid", handles->sysData.wifi_ssid);
+        prefs.putString("pass", handles->sysData.wifi_pass);
+        prefs.putString("token", handles->sysData.coreiot_token);
+        prefs.putString("server", handles->sysData.coreiot_server);
+        prefs.putInt("port", handles->sysData.coreiot_port.toInt());
+        prefs.end();
+        
+        server.send(200, "text/plain", "Cấu hình thành công! ESP32 đang khởi động lại kết nối...");
+        
+        // Tắt AP và chuyển sang STA
+        WiFi.softAPdisconnect(true);   // tắt Access Point
+        WiFi.mode(WIFI_STA);
+        WiFi.begin(handles->sysData.wifi_ssid.c_str(), handles->sysData.wifi_pass.c_str());
     } else {
-      server.send(404, "text/plain", "File not found");
+        server.send(400, "text/plain", "Thiếu tham số bắt buộc");
     }
-  });
-  server.on("/sensors", HTTP_GET, handleSensors);
-  server.on("/power", handlePower);
-  server.on("/led", handleLed);
-
-  server.begin();
 }
 
-void startAP()
-{
-  WiFi.mode(WIFI_AP);
-  WiFi.softAP(ssid.c_str(), password.c_str());
-  // Serial.print("AP IP address: ");
-  // Serial.println(WiFi.softAPIP());
-  isAPMode = true;
-  connecting = false;
+void resetConfig(SystemHandles* handles) {
+    Preferences prefs;
+    prefs.begin("config", false);
+    prefs.clear();   // xóa toàn bộ cấu hình
+    prefs.end();
+
+    handles->sysData.wifi_ssid = "";
+    handles->sysData.wifi_pass = "";
+    handles->sysData.coreiot_server = "";
+    handles->sysData.coreiot_token = "";
+    handles->sysData.coreiot_port = "";
+
+    // Bật lại AP để nhập cấu hình mới
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(handles->sysData.ap_ssid, handles->sysData.ap_pass);
+    Serial.println("Reset config chuyển về AP mode");
 }
 
-void connectToWiFi()
-{
-  WiFi.mode(WIFI_STA);
-  if (wifi_password.isEmpty())
-  {
-    WiFi.begin(wifi_ssid.c_str());
-  }
-  else
-  {
-    WiFi.begin(wifi_ssid.c_str(), wifi_password.c_str());
-  }
-  Serial.print("Connecting to: ");
-  Serial.print(wifi_ssid.c_str());
+void main_server_task(void *pvParameters) {
+    SystemHandles* handles = (SystemHandles*)pvParameters;
+    
+    // Initialize SPIFFS
+    if (!SPIFFS.begin(true)) {
+        Serial.println("SPIFFS Mount Failed");
+    }
 
-  Serial.print(" Password: ");
-  Serial.print(wifi_password.c_str());
-}
+    // Initialize Pins
+    pinMode(LED_PIN, OUTPUT);
+    pinMode(0, INPUT_PULLUP); // BOOT Button
 
-// ========== Main task ==========
-void main_server_task(void *pvParameters)
-{
-  pinMode(BOOT_PIN, INPUT_PULLUP);
-  pinMode(POWER_PIN, OUTPUT);
-  pinMode(LED_PIN, OUTPUT);
-  while (1)
-  {
-    server.handleClient();
-    startAP();
-    setupServer();
-    vTaskDelay(200); // avoid watchdog reset
-  }
+    // Init NeoPixel local
+    Adafruit_NeoPixel rgb_4_led(4, 8, NEO_GBR + NEO_KHZ800);
+    rgb_4_led.begin();
+    rgb_4_led.setBrightness(30);
+    rgb_4_led.clear();
+    rgb_4_led.show();
+
+
+    // Local WebServer instance
+    WebServer server(80);
+
+    // Setup Routes using Lambdas to capture server and handles
+    server.on("/", [&server]() { handleFile(server, "/index.html", "text/html"); });
+    server.on("/style.css", [&server]() { handleFile(server, "/style.css", "text/css"); });
+    server.on("/chart.js", [&server]() {handleFile(server, "/chart.js", "application/javascript"); }); 
+    server.on("/script.js", [&server]() { handleFile(server, "/script.js", "application/javascript"); });
+
+    // Thiết lập kết nối STA
+    server.on("/connect", HTTP_GET, [&server, handles]() { handleConnect(server, handles); });
+
+    // Serve icons dynamically
+    server.onNotFound([&server]() {
+        String uri = server.uri();
+        if (uri.startsWith("/icon/")) {
+            handleFile(server, uri.c_str(), "image/png");
+        } else {
+            server.send(404, "text/plain", "Not Found");
+        }
+    });
+    
+    server.on("/sensors", HTTP_GET, [&server, handles]() { handleSensors(server, handles); });
+    server.on("/led1", HTTP_GET, [&server, handles, &rgb_4_led]() { handleLed_1(server, handles, rgb_4_led); });
+    server.on("/led2", HTTP_GET, [&server, handles, &rgb_4_led]() { handleLed_2(server, handles, rgb_4_led); });
+    server.on("/status", HTTP_GET, [&server, handles]() { handleStatus(server, handles); });
+    server.on("/off", HTTP_GET, [&server, handles, &rgb_4_led]() { handleOff(server, handles, rgb_4_led); });
+    server.on("/tinyML", HTTP_GET, [&server, handles]() { handleTinyML(server, handles); });
+    server.begin();
+
+    // Variables for hardware-state tracking
+    bool last_led_1 = false;
+    bool last_led_2 = false;
+
+    while (1) {
+        server.handleClient();
+
+        // Zero-Global Hardware Polling
+        xSemaphoreTake(handles->mutexDeviceState, portMAX_DELAY);
+        bool current_led_1 = handles->deviceState.led_1;
+        bool current_led_2 = handles->deviceState.led_2;
+        xSemaphoreGive(handles->mutexDeviceState);
+
+        // Apply physical changes if state has diverged from tracking
+        if (current_led_1 != last_led_1) {
+            rgb_4_led.setPixelColor(LED_1_PIN, current_led_1 ? rgb_4_led.Color(255, 255, 255) : rgb_4_led.Color(0, 0, 0));
+            rgb_4_led.show();
+            last_led_1 = current_led_1;
+        }
+
+        if (current_led_2 != last_led_2) {
+            rgb_4_led.setPixelColor(LED_2_PIN, current_led_2 ? rgb_4_led.Color(255, 255, 255) : rgb_4_led.Color(0, 0, 0));
+            rgb_4_led.show();
+            last_led_2 = current_led_2;
+        }
+        
+        // Nút BOOT để chuyển sang AP 
+        if (digitalRead(0) == LOW) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            if (digitalRead(0) == LOW) {
+                resetConfig(handles);
+            }
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(20)); // prevent Watchdog timeout
+    }
 }

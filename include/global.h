@@ -5,21 +5,70 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
-
-extern float glob_temperature;
-extern float glob_humidity;
-
-extern String WIFI_SSID;
-extern String WIFI_PASS;
-extern String CORE_IOT_TOKEN;
-extern String CORE_IOT_SERVER;
-extern String CORE_IOT_PORT;
-
-extern String ssid;
-extern String password;
-extern String wifi_ssid;
-extern String wifi_password;
+#include "freertos/queue.h"
 
 extern boolean isWifiConnected;
 extern SemaphoreHandle_t xBinarySemaphoreInternet;
+
+struct SystemData {
+    String wifi_ssid;
+    String wifi_pass;
+    String fallback_ssid;
+    String fallback_pass;
+    String coreiot_server;
+    String coreiot_port;
+    String coreiot_token;
+    String ap_ssid;
+    String ap_pass;
+};
+
+// --- RTOS DATA STRUCTURES ---
+// struct for data transmission across queues
+struct SensorData {
+    float temperature;
+    float humidity;
+    int state;
+};
+
+struct TinyMLData{
+    float predict_value;
+    String predict_state;
+};
+
+#define POWER_PIN 47
+#define LED_PIN 38
+#define FAN_PIN 48
+
+#define LED_1_PIN   0
+#define LED_2_PIN   1
+
+
+// struct holding device states for Web Server
+struct DeviceStates {
+    bool led_1;
+    bool led_2;
+    bool tinyml_mode;
+};
+
+// struct holding system handles injected into tasks
+struct SystemHandles {
+    QueueHandle_t qLed;         // queue for led_blinky task
+    QueueHandle_t qNeo;         // queue for neo_blinky task
+    QueueHandle_t qLcd;         // queue for temp_humi_lcd_display task
+    QueueHandle_t qTinyML;      // queue for tinyML task
+    QueueHandle_t qTrigger;     // queue trigger để đánh thức TinyML task
+    SemaphoreHandle_t semLcd;   // binary semaphore to wake up LCD
+    SemaphoreHandle_t mutexI2C; // mutex of I2C bus
+    SemaphoreHandle_t mutexDeviceState; // mutex for DeviceStates
+    DeviceStates deviceState;   // device states protected by mutex
+    SemaphoreHandle_t mutexConfig; // mutex for Config values
+    SystemData sysData;         // Zero-Global network configurations
+};
+
+#define COLD            0
+#define COOL            1
+#define WARM            2
+#define HOT             3
+#define SCORCHING       4
+
 #endif
