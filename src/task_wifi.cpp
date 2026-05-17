@@ -8,8 +8,8 @@ void init_wifi(SystemHandles* handles) {
     handles->sysData.wifi_pass = prefs.getString("pass", "");
     prefs.end();
 
-    // handles->sysData.wifi_ssid = "hts";
-    // handles->sysData.wifi_pass = "11111111"; 
+    handles->sysData.wifi_ssid = "hts";
+    handles->sysData.wifi_pass = "11111111"; 
     // handles->sysData.coreiot_server = "app.coreiot.io";
     // handles->sysData.coreiot_port = 1883U; 
     // handles->sysData.coreiot_token = "7d8thcolc3gb7jirlyp1";
